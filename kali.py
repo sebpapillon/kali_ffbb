@@ -8,6 +8,7 @@ import json
 from datetime import date
 import datetime
 
+
 class ffbb:
     def __init__(self):
         print("init ffbb")
@@ -113,7 +114,7 @@ class kali:
                         r.append(self.get_ffbb_team_name(j["awayTeam"]["name"]))
                     else:
                         r.append(j["awayTeam"]["name"])
-                    if(datetime.datetime.now()<x):
+                    if(datetime.datetime.now()<x or True):
                         cur.execute("insert into kali values (?,?,?,?,?)",r)
         con.commit()
         con.close()
@@ -159,7 +160,7 @@ def results():
     current_week=datetime.datetime.now().isocalendar()[1]
     for match in kali:
         week_of_match=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()[1]
-        if week_of_match==current_week-3:
+        if week_of_match==current_week-1:
             print()
             cur.execute("select team,ffbb from compet where compet=?",(match[0],))
             team=cur.fetchone()[0]
@@ -186,16 +187,19 @@ def next_week():
     current_week=datetime.datetime.now().isocalendar()[1]
     for match in kali:
         week_of_match=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()[1]
-        if week_of_match==current_week+1:
-            print(match)
+        if week_of_match==current_week:
+            cur.execute("select team,ffbb from compet where compet=?",(match[0],))
+            team=cur.fetchone()[0]
+            local=team if "NEUVIL" in match[3] else match[3]
+            away=team if "NEUVIL" in match[4] else match[4]
+            print(local+" contre "+away)
 
 def main():
     #ffbb()
     #kali()    
-    #compare()
+    compare()
     results()
     next_week()
     
 if __name__ == "__main__":
     main()
-
