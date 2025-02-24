@@ -114,7 +114,7 @@ class kali:
                         r.append(self.get_ffbb_team_name(j["awayTeam"]["name"]))
                     else:
                         r.append(j["awayTeam"]["name"])
-                    if(datetime.datetime.now()<x or True):
+                    if(datetime.datetime.now()<x):
                         cur.execute("insert into kali values (?,?,?,?,?)",r)
         con.commit()
         con.close()
@@ -195,8 +195,8 @@ def next_week():
             print(local+" contre "+away)
 
 def main():
-    #ffbb()
-    #kali()    
+    ffbb()
+    kali()
     compare()
     results()
     next_week()
