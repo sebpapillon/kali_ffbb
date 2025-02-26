@@ -7,10 +7,10 @@ import sqlite3
 import json
 from datetime import date
 import datetime
-
+import threading
 
 class ffbb:
-    def __init__(self):
+    def init(self):
         print("init ffbb")
         con=sqlite3.connect("kalisport.sqlite")
         cur=con.cursor()
@@ -18,7 +18,9 @@ class ffbb:
         con.commit()
         con.close()
         for champ in self.get_champs():
-            self.get_data_from_champ(champ)
+            #self.get_data_from_champ(champ)
+            print(champ)
+            threading.Thread(target=self.get_data_from_champ, args=(champ,)).start()
         
     def get_champs(self):
         champs=[]
@@ -44,6 +46,7 @@ class ffbb:
         soup = BeautifulSoup(response.text,"lxml")
         mydivs = soup.find_all("tr", {"class": ["altern-2", "no-altern-2"]})
         for champ in mydivs:
+            print(champ)
             datas = BeautifulSoup(str(champ),"lxml")
             data = datas.find_all("td")
             d=[]
@@ -63,7 +66,7 @@ class ffbb:
         con.close()        
 
 class kali:
-    def __init__(self):
+    def init(self):
         print("init kali")
         self.teams_href=[]
         con=sqlite3.connect("kalisport.sqlite")
@@ -73,6 +76,56 @@ class kali:
         con.close()
         self.get_teams()
         self.get_matchs()
+    
+    def results(self):
+        print("\n----------\n results\n----------")
+        con=sqlite3.connect("kalisport.sqlite")
+        cur=con.cursor()
+        cur.execute("select * from ffbb")
+        kali=cur.fetchall()
+        current_week=datetime.datetime.now().isocalendar()[1]
+        for match in kali:
+            week_of_match=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()[1]
+            if week_of_match==current_week-1:
+                print()
+                cur.execute("select team,ffbb from compet where compet=?",(match[0],))
+                team=cur.fetchone()[0]
+                local=team if "NEUVIL" in match[3] else match[3]
+                away=team if "NEUVIL" in match[4] else match[4]
+                result=re.search("(\d*) - (\d*)",match[5])
+                nba_wins = True if (((result[1] > result[2]) and ("NEUVIL" in match[3])) or ((result[1] < result[2]) and ("NEUVIL" in match[4]))) else False
+                if nba_wins:
+                    print("Victoire des ",end="")
+                else:
+                    print("Défaite des ",end="")
+                if "NEUVIL" in match[3]:
+                    print(local+" contre "+away)
+                else:
+                    print(away+" contre "+local)
+                print(match[5])
+    
+    def next_week(self):
+        semaine=["","lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]
+        print("\n----------\n next\n----------")
+        con=sqlite3.connect("kalisport.sqlite")
+        cur=con.cursor()
+        cur.execute("select * from kali")
+        kali=cur.fetchall()
+        current_week=datetime.datetime.now().isocalendar()[1]
+        for match in kali:
+            isodate=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()
+            week_of_match=isodate[1]
+            day_of_match=isodate[2]
+            if week_of_match==current_week:
+                cur.execute("select team,ffbb from compet where compet=?",(match[0],))
+                team=cur.fetchone()[0]
+                local=team if "NEUVIL" in match[3] else match[3]
+                away=team if "NEUVIL" in match[4] else match[4]
+                if "NEUVIL" in match[3]:
+                    print(local+" contre "+away+"\nà domicile")
+                else:
+                    print(away+" contre "+local+"\nà l'extérieur")
+                print("le "+semaine[day_of_match]+" "+match[1]+" à "+match[2]+"\n")
         
     def get_teams(self):
         response = requests.get("https://neuvillebasket.fr/equipes",timeout=2)
@@ -80,6 +133,7 @@ class kali:
         soup = BeautifulSoup(response.text,"lxml")
         
         for ul in soup.find("div",{"id": "content"}):
+            print(ul)
             soup = BeautifulSoup(str(ul),"lxml")
             for a in soup.find_all("a"):
                 if "title" in a.attrs:
@@ -89,6 +143,7 @@ class kali:
         con=sqlite3.connect("kalisport.sqlite")
         cur=con.cursor()
         for href in self.teams_href:
+            print(href)
             response = requests.get(href)
             response.encoding = response.apparent_encoding
             soup = BeautifulSoup(response.text,"lxml")
@@ -98,6 +153,7 @@ class kali:
             compet = r.group(2).strip()
             
             for jason in soup.find_all("script",{"type":"application/ld+json"}):
+                print(jason)
                 j=json.loads(str(jason.contents[0]))
                 if "@type" in j.keys():
                     d=re.search("([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})",j["startDate"])
@@ -151,55 +207,16 @@ def compare():
             print("ffbb")
             print(match_ffbb)
 
-def results():
-    print("\n----------\n results\n----------")
-    con=sqlite3.connect("kalisport.sqlite")
-    cur=con.cursor()
-    cur.execute("select * from ffbb")
-    kali=cur.fetchall()
-    current_week=datetime.datetime.now().isocalendar()[1]
-    for match in kali:
-        week_of_match=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()[1]
-        if week_of_match==current_week-1:
-            print()
-            cur.execute("select team,ffbb from compet where compet=?",(match[0],))
-            team=cur.fetchone()[0]
-            local=team if "NEUVIL" in match[3] else match[3]
-            away=team if "NEUVIL" in match[4] else match[4]
-            result=re.search("(\d*) - (\d*)",match[5])
-            nba_wins = True if (((result[1] > result[2]) and ("NEUVIL" in match[3])) or ((result[1] < result[2]) and ("NEUVIL" in match[4]))) else False
-            if nba_wins:
-                print("Victoire des ",end="")
-            else:
-                print("Défaite des ",end="")
-            if "NEUVIL" in match[3]:
-                print(local+" contre "+away)
-            else:
-                print(away+" contre "+local)
-            print(match[5])
 
-def next_week():
-    print("\n----------\n next\n----------")
-    con=sqlite3.connect("kalisport.sqlite")
-    cur=con.cursor()
-    cur.execute("select * from ffbb")
-    kali=cur.fetchall()
-    current_week=datetime.datetime.now().isocalendar()[1]
-    for match in kali:
-        week_of_match=datetime.datetime.strptime(match[1], "%d/%m/%Y").isocalendar()[1]
-        if week_of_match==current_week:
-            cur.execute("select team,ffbb from compet where compet=?",(match[0],))
-            team=cur.fetchone()[0]
-            local=team if "NEUVIL" in match[3] else match[3]
-            away=team if "NEUVIL" in match[4] else match[4]
-            print(local+" contre "+away)
 
 def main():
-    ffbb()
-    kali()
+    f=ffbb()
+    f.init()
+    k=kali()
+    k.init()
     compare()
-    results()
-    next_week()
+    k.results()
+    k.next_week()
     
 if __name__ == "__main__":
     main()
