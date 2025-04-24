@@ -9,6 +9,7 @@ from datetime import date
 import datetime
 import threading
 import sys
+from pprint import pprint
 
 class ffbb:
     def init(self,thr):
@@ -25,31 +26,50 @@ class ffbb:
         
     def get_champs(self):
         champs=[]
-        url="https://resultats.ffbb.com/championnat/equipe/bcd36d30da.html"
+        url="https://competitions.ffbb.com/ligues/pdl/comites/0072/clubs/pdl0072080"
         response = requests.get(url)
         response.encoding = response.apparent_encoding
         soup = BeautifulSoup(response.text,"lxml")
-        mychamps = soup.find_all("option")
+        mychamps = soup.find_all("a",href=True)
         
         for champ in mychamps:
-            chp=[]
-            chp.append(re.search("(C.*)(<.*)",str(champ))[1])
-            chp.append(champ['value'])
-            champs.append(chp)
+            if "equipes" in champ['href'] and champ['href'] not in champs:
+                champs.append("https://competitions.ffbb.com"+champ['href'])
             
+        pprint(champs)
         return(champs)    
             
     def get_data_from_champ(self,chp):
         con=sqlite3.connect("kalisport.sqlite")
         cur=con.cursor()
-        response = requests.get("https://resultats.ffbb.com/championnat/equipe/division/"+chp[1]+".html")
+        response = requests.get(chp)
         response.encoding = response.apparent_encoding
         soup = BeautifulSoup(response.text,"lxml")
-        mydivs = soup.find_all("tr", {"class": ["altern-2", "no-altern-2"]})
+        
+        team = soup.select("h1.flex-1")
+        print(team[0].text)
+        
+        champ_title = soup.select("div.flex.flex-col.flex-1")
+        print(champ_title[0].text)
+        '''r = re.search("<span.*?>(.*?)<\/span>",str(champ_title[0]))
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>champ title")
+        print(r.group(1).strip())'''
+        
+        
+        mydivs = soup.select("div.bg-white.flex.flex-col.border-opacity-60")
+        
         for champ in mydivs:
+            print("----------------new champ---------------------")
             datas = BeautifulSoup(str(champ),"lxml")
-            data = datas.find_all("td")
-            d=[]
+            data = datas.find_all("div")
+            for idx,d in enumerate(data):
+                print(str(idx)+" "+d.text)
+            data = datas.find_all("span")
+            for idx,d in enumerate(data):
+                print(str(idx)+" "+d.text)
+            
+            
+            '''d=[]
             if(len(data)>2):
                 d.append(re.search("C.*: (.*)",chp[0])[1])
                 d.append(re.search("..\/..\/....",str(data[1]))[0])
@@ -61,7 +81,7 @@ class ffbb:
                 if(len(data)==9):
                     d.append(re.search("(.*\">)(.*)(<\/a><\/td>)",str(data[5]))[2])
                     d.append(re.search("<td align=\"center\">(.*)<\/td>",str(data[7]))[1])
-                cur.execute("insert into ffbb values (?,?,?,?,?,?)",d)
+                cur.execute("insert into ffbb values (?,?,?,?,?,?)",d)'''
         con.commit()
         con.close()        
 
@@ -127,7 +147,6 @@ class kali:
             week_of_match=isodate[1]
             day_of_match=isodate[2]
             if week_of_match==current_week:
-                print(match[0])
                 cur.execute("select team,ffbb from compet where compet=?",(match[0],))
                 team=cur.fetchone()[0]
                 local=team if "NEUVIL" in match[3] else match[3]
@@ -231,8 +250,9 @@ def main():
     k.results(-1)
     k.results(0)
     k.next_week()
-    
     compare()
+    
+    #f.get_data_from_champ("https://competitions.ffbb.com/ligues/pdl/comites/0072/clubs/pdl0072080/equipes/200000005071173")
 
 if __name__ == "__main__":
     main()
